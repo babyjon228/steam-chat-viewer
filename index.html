@@ -1,0 +1,566 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Steam Chat Viewer</title>
+<style>
+  :root {
+    --bg: #171a21; --panel: #1b2838; --panel2: #213246; --line: #2a3f5a;
+    --text: #e6edf3; --muted: #8f98a0; --accent: #66c0f4; --mine: #2b5278; --theirs: #2a3442;
+    --hl: #f5c518;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 14px/1.45 "Segoe UI", system-ui, sans-serif; }
+  button, input, textarea { font: inherit; color: inherit; }
+  button { background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 7px 12px; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: #0b1620; border-color: var(--accent); font-weight: 600; }
+  input[type=search], textarea { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; width: 100%; }
+  a { color: var(--accent); }
+
+  /* ---------- import screen ---------- */
+  #import { max-width: 760px; margin: 0 auto; padding: 32px 16px; }
+  #import h1 { margin: 0 0 4px; font-size: 26px; }
+  #import .sub { color: var(--muted); margin-bottom: 24px; }
+  .steps { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px 20px; margin-bottom: 20px; }
+  .steps ol { margin: 8px 0 0; padding-left: 20px; }
+  .steps li { margin: 6px 0; }
+  code { background: var(--bg); padding: 1px 5px; border-radius: 4px; }
+  .bm { display: inline-block; margin: 6px 0 2px; padding: 6px 12px; border-radius: 6px; background: var(--accent); color: #0b1620; font-weight: 600; text-decoration: none; cursor: grab; }
+  .hint { color: var(--muted); font-size: 12px; }
+  .steps.manual { margin-top: 0; }
+  .steps.manual summary { color: var(--text); }
+  #drop { border: 2px dashed var(--line); border-radius: 10px; padding: 36px 16px; text-align: center; color: var(--muted); transition: .15s; }
+  #drop.over { border-color: var(--accent); color: var(--text); background: var(--panel); }
+  #drop button { margin-top: 12px; }
+  details { margin-top: 16px; }
+  summary { cursor: pointer; color: var(--muted); }
+  #paste { height: 140px; margin-top: 8px; resize: vertical; }
+  #importMsg { margin-top: 12px; color: #ff8a80; min-height: 1em; }
+
+  /* ---------- viewer ---------- */
+  #viewer { display: none; height: 100%; grid-template-columns: 300px 1fr; }
+  #viewer.on { display: grid; }
+  aside { background: var(--panel); border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+  aside header { padding: 12px; border-bottom: 1px solid var(--line); display: grid; gap: 8px; }
+  .me { color: var(--muted); font-size: 12px; }
+  .me b { color: var(--text); }
+  #contacts { overflow-y: auto; flex: 1; }
+  .contact { padding: 10px 12px; border-bottom: 1px solid #22344a; cursor: pointer; display: grid; grid-template-columns: 36px 1fr auto; gap: 10px; align-items: center; }
+  .contact:hover { background: var(--panel2); }
+  .contact.active { background: var(--mine); }
+  .ava { width: 36px; height: 36px; border-radius: 4px; display: grid; place-items: center; font-weight: 700; color: #fff; }
+  .contact .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .contact .preview { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .contact .meta { color: var(--muted); font-size: 11px; text-align: right; }
+  .contact .badge { display: inline-block; background: var(--line); border-radius: 9px; padding: 0 7px; margin-top: 3px; }
+  aside footer { padding: 10px 12px; border-top: 1px solid var(--line); display: flex; gap: 8px; }
+  aside footer button { flex: 1; font-size: 12px; padding: 6px; }
+
+  main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  main header { padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--panel); display: flex; gap: 12px; align-items: center; }
+  main header .title { flex: 1; min-width: 0; }
+  main header .title b { font-size: 16px; }
+  main header .title div { color: var(--muted); font-size: 12px; }
+  #back { display: none; }
+  #chatSearch { max-width: 260px; }
+  #messages { flex: 1; overflow-y: auto; padding: 16px; }
+  .empty { color: var(--muted); text-align: center; margin-top: 30vh; }
+  .day { text-align: center; margin: 18px 0 10px; }
+  .day span { background: var(--panel2); color: var(--muted); font-size: 12px; padding: 3px 10px; border-radius: 10px; }
+  .msg { display: flex; margin: 3px 0; }
+  .msg.mine { justify-content: flex-end; }
+  .bubble { max-width: min(640px, 78%); background: var(--theirs); border-radius: 10px; padding: 6px 10px 4px; white-space: pre-wrap; word-wrap: break-word; overflow-wrap: anywhere; }
+  .mine .bubble { background: var(--mine); }
+  .bubble .who { font-size: 12px; font-weight: 600; color: var(--accent); }
+  .bubble time { display: block; text-align: right; font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .bubble .sticker, .bubble .emo { color: var(--hl); }
+  mark { background: var(--hl); color: #000; border-radius: 2px; }
+  .msg.flash .bubble { outline: 2px solid var(--hl); }
+  .result { padding: 8px 12px; border-bottom: 1px solid #22344a; cursor: pointer; }
+  .result:hover { background: var(--panel2); }
+  .result .r-head { font-size: 12px; color: var(--muted); }
+
+  @media (max-width: 720px) {
+    #viewer { grid-template-columns: 1fr; }
+    #viewer.chat-open aside { display: none; }
+    #viewer:not(.chat-open) main { display: none; }
+    #back { display: inline-block; }
+    #chatSearch { max-width: 140px; }
+  }
+</style>
+</head>
+<body>
+
+<section id="import">
+  <h1>Steam Chat Viewer</h1>
+  <div class="sub">Удобный просмотр истории переписки из Steam. Всё работает локально, файл никуда не отправляется.</div>
+
+  <div class="steps">
+    <b>Быстрый способ — закладка</b>
+    <ol>
+      <li>Перетащите эту кнопку на панель закладок браузера: <a id="bookmarklet" class="bm" href="#" title="Перетащите на панель закладок">📥 Steam → история чатов</a>
+        <br><span class="hint">Панель закладок не видна? <code>Ctrl+Shift+B</code></span></li>
+      <li>Откройте <a href="https://help.steampowered.com/ru/accountdata/GetFriendMessagesLog" target="_blank" rel="noopener">журнал сообщений Steam</a> и войдите в аккаунт.</li>
+      <li>Нажмите закладку. Она сама загрузит всю историю и скачает файл <code>steam-chat-….html</code>.</li>
+      <li>Перетащите скачанный файл сюда.</li>
+    </ol>
+  </div>
+
+  <details class="steps manual">
+    <summary><b>Ручной способ</b></summary>
+    <ol>
+      <li>Откройте страницу <a href="https://help.steampowered.com/ru/accountdata/GetFriendMessagesLog" target="_blank" rel="noopener">help.steampowered.com → Данные аккаунта → Журнал сообщений</a> и войдите в аккаунт.</li>
+      <li>Прокрутите вниз и нажимайте <b>«Загрузить ещё»</b>, пока кнопка не пропадёт (иначе сохранится только часть истории).</li>
+      <li>Нажмите <code>Ctrl+S</code> → «Веб-страница, только HTML» и сохраните файл.</li>
+      <li>Перетащите сохранённый файл сюда (можно несколько сразу).</li>
+    </ol>
+  </details>
+
+  <div id="drop">
+    Перетащите сюда .html файл со страницы Steam
+    <br><button class="primary" id="pick">Выбрать файл…</button>
+    <input type="file" id="file" accept=".html,.htm,.txt,.mhtml" multiple hidden>
+  </div>
+
+  <details>
+    <summary>…или вставить скопированную таблицу / HTML</summary>
+    <textarea id="paste" placeholder="Выделите таблицу на странице (Ctrl+A, Ctrl+C) и вставьте сюда"></textarea>
+    <button id="pasteGo" style="margin-top:8px">Открыть</button>
+  </details>
+  <div id="importMsg"></div>
+</section>
+
+<section id="viewer">
+  <aside>
+    <header>
+      <div class="me">Вы: <b id="meName"></b></div>
+      <input type="search" id="contactSearch" placeholder="Поиск собеседника…">
+      <input type="search" id="globalSearch" placeholder="Поиск по всем сообщениям…">
+    </header>
+    <div id="contacts"></div>
+    <footer>
+      <button id="swapMe" title="Если программа неправильно определила, кто из участников — вы">Это не я</button>
+      <button id="reload">Другой файл</button>
+    </footer>
+  </aside>
+  <main>
+    <header>
+      <button id="back">←</button>
+      <div class="title"><b id="chatName">Выберите чат</b><div id="chatInfo"></div></div>
+      <input type="search" id="chatSearch" placeholder="Поиск в чате…">
+      <button id="exportTxt" title="Сохранить переписку в .txt">.txt</button>
+    </header>
+    <div id="messages"><div class="empty">Выберите собеседника слева</div></div>
+  </main>
+</section>
+
+<script>
+"use strict";
+const $ = s => document.querySelector(s);
+
+// ---------- state ----------
+let messages = [];      // {from, to, date: Date|null, raw, text, idx}
+let people = [];        // participant names sorted by frequency
+let me = null;
+let chats = new Map();  // other -> [messages]
+let current = null;
+
+// ---------- date parsing ----------
+const MONTHS = {
+  jan:0, feb:1, mar:2, apr:3, may:4, jun:5, jul:6, aug:7, sep:8, oct:9, nov:10, dec:11,
+  янв:0, фев:1, мар:2, апр:3, мая:4, май:4, июн:5, июл:6, авг:7, сен:8, окт:9, ноя:10, дек:11
+};
+function parseDate(s) {
+  if (!s) return null;
+  s = s.replace(/ /g, " ").trim();
+  if (/^\d{9,10}$/.test(s)) return new Date(+s * 1000);
+  const iso = Date.parse(s);
+  if (!isNaN(iso) && /\d{4}-\d{2}-\d{2}/.test(s)) return new Date(iso);
+
+  const low = s.toLowerCase();
+  let month = -1;
+  for (const [k, v] of Object.entries(MONTHS)) {
+    if (new RegExp("(^|[^a-zа-яё])" + k).test(low)) { month = v; break; }
+  }
+  const time = low.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(am|pm)?/);
+  let h = 0, mi = 0, se = 0;
+  if (time) {
+    h = +time[1]; mi = +time[2]; se = +(time[3] || 0);
+    if (time[4] === "pm" && h < 12) h += 12;
+    if (time[4] === "am" && h === 12) h = 0;
+  }
+  const rest = time ? low.replace(time[0], " ") : low;
+  const nums = (rest.match(/\d+/g) || []).map(Number);
+  const year = nums.find(n => n > 1999);
+  if (month >= 0) {
+    const day = nums.find(n => n >= 1 && n <= 31);
+    if (day) return new Date(year || new Date().getFullYear(), month, day, h, mi, se);
+  }
+  // dd.mm.yyyy or mm/dd/yyyy
+  let m = rest.match(/(\d{1,2})[./](\d{1,2})[./](\d{2,4})/);
+  if (m) {
+    let y = +m[3]; if (y < 100) y += 2000;
+    const dot = rest.includes(".");
+    const d = dot ? +m[1] : +m[2], mo = (dot ? +m[2] : +m[1]) - 1;
+    return new Date(y, mo, d, h, mi, se);
+  }
+  if (!isNaN(iso)) return new Date(iso);
+  return null;
+}
+
+// ---------- column detection ----------
+const HEAD = {
+  from: /sender|from|отправ|автор|author/i,
+  to:   /recip|receiver|to\b|получ|кому|партн|partner/i,
+  date: /time|date|врем|дата|timestamp/i,
+  text: /message|text|сообщ|текст|content|body/i
+};
+function mapHeaders(headers) {
+  const map = {};
+  headers.forEach((h, i) => {
+    for (const [k, re] of Object.entries(HEAD)) {
+      if (map[k] === undefined && re.test(h)) { map[k] = i; break; }
+    }
+  });
+  return map;
+}
+function guessColumns(rows) {
+  const n = Math.max(...rows.map(r => r.length));
+  const sample = rows.slice(0, 200);
+  const dateScore = [], lenScore = [], uniq = [];
+  for (let c = 0; c < n; c++) {
+    const vals = sample.map(r => r[c] || "");
+    dateScore[c] = vals.filter(v => /\d/.test(v) && parseDate(v)).length;
+    lenScore[c] = vals.reduce((a, v) => a + v.length, 0);
+    uniq[c] = new Set(vals).size;
+  }
+  const map = {};
+  map.date = dateScore.indexOf(Math.max(...dateScore));
+  const others = [...Array(n).keys()].filter(c => c !== map.date);
+  // message = column with most distinct values / longest text
+  others.sort((a, b) => (uniq[b] + lenScore[b] / 50) - (uniq[a] + lenScore[a] / 50));
+  map.text = others[0];
+  const names = others.slice(1).sort((a, b) => a - b);
+  map.from = names[0]; map.to = names[1];
+  return map;
+}
+
+// ---------- parsing input ----------
+function cellText(td) {
+  // Steam emoticons/stickers sometimes render as <img alt=":name:">
+  td.querySelectorAll("img[alt]").forEach(img => img.replaceWith(img.alt));
+  td.querySelectorAll("br").forEach(br => br.replaceWith("\n"));
+  return td.textContent.replace(/[ \t ]+/g, " ").replace(/\n\s*/g, "\n").trim();
+}
+
+function rowsFromHtml(html) {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const out = [];
+  for (const table of doc.querySelectorAll("table")) {
+    const trs = [...table.querySelectorAll("tr")];
+    if (trs.length < 2) continue;
+    let headers = null;
+    const body = [];
+    for (const tr of trs) {
+      const ths = tr.querySelectorAll("th");
+      if (ths.length && !headers) { headers = [...ths].map(cellText); continue; }
+      const tds = [...tr.querySelectorAll("td")].map(cellText);
+      if (tds.length >= 3) body.push(tds);
+    }
+    if (body.length) out.push({ headers, body });
+  }
+  return out;
+}
+
+function rowsFromText(text) {
+  const lines = text.split(/\r?\n/).filter(l => l.includes("\t"));
+  if (!lines.length) return [];
+  let rows = lines.map(l => l.split("\t").map(s => s.trim()));
+  let headers = null;
+  if (Object.keys(mapHeaders(rows[0])).length >= 3) headers = rows.shift();
+  rows = rows.filter(r => r.length >= 3);
+  return rows.length ? [{ headers, body: rows }] : [];
+}
+
+function decodeMhtml(text) {
+  // "Save as single file" in Chrome produces quoted-printable HTML
+  if (!/^MIME-Version:/im.test(text.slice(0, 2000))) return text;
+  const part = text.split(/\r?\n\r?\n/).slice(1).join("\n\n");
+  const bytes = part.replace(/=\r?\n/g, "").replace(/=([0-9A-F]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
+  try { return decodeURIComponent(escape(bytes)); } catch { return bytes; }
+}
+
+function extract(sources) {
+  const result = [];
+  for (const src of sources) {
+    const text = decodeMhtml(src);
+    const tables = /<t[dr][\s>]/i.test(text) ? rowsFromHtml(text) : rowsFromText(text);
+    for (const { headers, body } of tables) {
+      let map = headers ? mapHeaders(headers) : {};
+      if (["from", "to", "date", "text"].some(k => map[k] === undefined)) map = { ...guessColumns(body), ...map };
+      for (const r of body) {
+        const raw = r[map.date] || "";
+        result.push({ from: r[map.from] || "?", to: r[map.to] || "?", raw, date: parseDate(raw), text: r[map.text] || "" });
+      }
+    }
+  }
+  return result;
+}
+
+// ---------- model ----------
+function build(list) {
+  // dedupe (several overlapping files) and sort chronologically
+  const seen = new Set();
+  messages = [];
+  list.forEach((m, i) => {
+    const key = m.from + "\u0001" + m.to + "\u0001" + m.raw + "\u0001" + m.text;
+    if (seen.has(key)) return;
+    seen.add(key);
+    m.idx = i;
+    messages.push(m);
+  });
+  const allDated = messages.every(m => m.date);
+  if (allDated) messages.sort((a, b) => a.date - b.date || b.idx - a.idx);
+  else messages.reverse(); // Steam lists newest first
+
+  const freq = new Map();
+  for (const m of messages) for (const p of [m.from, m.to]) freq.set(p, (freq.get(p) || 0) + 1);
+  people = [...freq.entries()].sort((a, b) => b[1] - a[1]).map(e => e[0]);
+  setMe(people[0]);
+}
+
+function setMe(name) {
+  me = name;
+  chats = new Map();
+  for (const m of messages) {
+    const other = m.from === me ? m.to : m.to === me ? m.from : m.to;
+    if (!chats.has(other)) chats.set(other, []);
+    chats.get(other).push(m);
+  }
+  $("#meName").textContent = me;
+  current = null;
+  renderContacts();
+  renderEmpty();
+}
+
+// ---------- rendering ----------
+const esc = s => s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const colors = ["#c0392b", "#8e44ad", "#2980b9", "#16a085", "#d35400", "#27ae60", "#7f8c8d", "#b8860b"];
+const colorOf = s => colors[[...s].reduce((a, c) => a + c.charCodeAt(0), 0) % colors.length];
+const fmtDay = d => d.toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" });
+const fmtTime = d => d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+const fmtShort = d => d.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "2-digit" });
+
+function rich(text, q) {
+  // Steam BBCode → readable markup
+  let s = esc(text);
+  s = s.replace(/\[emoticon\](.*?)\[\/emoticon\]/gi, '<span class="emo">:$1:</span>');
+  s = s.replace(/\[sticker type=&quot;?([^\]&]*?)&quot;?[^\]]*\](?:\[\/sticker\])?/gi, '<span class="sticker">[стикер: $1]</span>');
+  s = s.replace(/\[url=([^\]]+)\](.*?)\[\/url\]/gi, (_, u, t) => `<a href="${u}" target="_blank" rel="noopener noreferrer">${t}</a>`);
+  s = s.replace(/\[img\](.*?)\[\/img\]/gi, '<a href="$1" target="_blank" rel="noopener noreferrer">[картинка]</a>');
+  s = s.replace(/\[\/?(b|i|u|spoiler|quote[^\]]*|code|lobbyinvite[^\]]*|gameinvite[^\]]*|tradeoffer[^\]]*)\]/gi, "");
+  s = s.replace(/(^|[\s(])(https?:\/\/[^\s<]+)/g, '$1<a href="$2" target="_blank" rel="noopener noreferrer">$2</a>');
+  if (q) {
+    const re = new RegExp("(" + q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ")(?![^<]*>)", "gi");
+    s = s.replace(re, "<mark>$1</mark>");
+  }
+  return s;
+}
+
+const plain = text => text
+  .replace(/\[emoticon\](.*?)\[\/emoticon\]/gi, ":$1:")
+  .replace(/\[sticker type="?([^\]"]*)"?[^\]]*\](?:\[\/sticker\])?/gi, "[стикер]")
+  .replace(/\[img\].*?\[\/img\]/gi, "[картинка]")
+  .replace(/\[\/?[a-z]+(=[^\]]*)?[^\]]*\]/gi, "");
+
+function renderContacts() {
+  const q = $("#contactSearch").value.trim().toLowerCase();
+  const list = [...chats.entries()]
+    .filter(([n]) => !q || n.toLowerCase().includes(q))
+    .sort((a, b) => {
+      const la = a[1][a[1].length - 1], lb = b[1][b[1].length - 1];
+      return (lb.date && la.date) ? lb.date - la.date : b[1].length - a[1].length;
+    });
+  $("#contacts").innerHTML = list.map(([name, ms]) => {
+    const last = ms[ms.length - 1];
+    return `<div class="contact ${name === current ? "active" : ""}" data-name="${esc(name)}">
+      <div class="ava" style="background:${colorOf(name)}">${esc([...name][0] || "?").toUpperCase()}</div>
+      <div style="min-width:0"><div class="name">${esc(name)}</div>
+        <div class="preview">${last.from === me ? "Вы: " : ""}${esc(plain(last.text).slice(0, 80))}</div></div>
+      <div class="meta">${last.date ? fmtShort(last.date) : ""}<br><span class="badge">${ms.length}</span></div>
+    </div>`;
+  }).join("") || '<div class="empty" style="margin-top:20px">Никого не найдено</div>';
+}
+
+function renderEmpty() {
+  $("#chatName").textContent = "Выберите чат";
+  $("#chatInfo").textContent = `${messages.length} сообщений · ${chats.size} собеседников`;
+  $("#messages").innerHTML = '<div class="empty">Выберите собеседника слева</div>';
+  $("#viewer").classList.remove("chat-open");
+}
+
+function openChat(name, focusMsg) {
+  current = name;
+  $("#viewer").classList.add("chat-open");
+  renderContacts();
+  renderChat(focusMsg);
+}
+
+function renderChat(focusMsg) {
+  const ms = chats.get(current) || [];
+  const q = $("#chatSearch").value.trim();
+  const shown = q ? ms.filter(m => m.text.toLowerCase().includes(q.toLowerCase())) : ms;
+  const first = ms.find(m => m.date), last = [...ms].reverse().find(m => m.date);
+  $("#chatName").textContent = current;
+  $("#chatInfo").textContent = `${ms.length} сообщений` +
+    (first ? ` · ${fmtDay(first.date)} — ${fmtDay(last.date)}` : "") +
+    (q ? ` · найдено: ${shown.length}` : "");
+
+  const parts = [];
+  let day = null;
+  for (const m of shown) {
+    const d = m.date ? m.date.toDateString() : null;
+    if (d && d !== day) { day = d; parts.push(`<div class="day"><span>${fmtDay(m.date)}</span></div>`); }
+    const mine = m.from === me;
+    const who = !mine && m.from !== current ? `<div class="who">${esc(m.from)}</div>` : "";
+    parts.push(`<div class="msg ${mine ? "mine" : ""}" data-i="${messages.indexOf(m)}"><div class="bubble">${who}${rich(m.text, q)}<time>${m.date ? fmtTime(m.date) : esc(m.raw)}</time></div></div>`);
+  }
+  const box = $("#messages");
+  box.innerHTML = parts.join("") || '<div class="empty">Ничего не найдено</div>';
+  if (focusMsg) {
+    const el = box.querySelector(`[data-i="${messages.indexOf(focusMsg)}"]`);
+    if (el) { el.scrollIntoView({ block: "center" }); el.classList.add("flash"); }
+  } else box.scrollTop = box.scrollHeight;
+}
+
+function renderGlobalResults(q) {
+  const ql = q.toLowerCase();
+  const hits = messages.filter(m => m.text.toLowerCase().includes(ql)).slice(-500).reverse();
+  $("#contacts").innerHTML = `<div class="result r-head" style="cursor:default">Найдено: ${hits.length}${hits.length === 500 ? "+" : ""}</div>` +
+    hits.map(m => {
+      const other = m.from === me ? m.to : m.from;
+      return `<div class="result" data-i="${messages.indexOf(m)}">
+        <div class="r-head">${esc(other)} · ${m.date ? fmtShort(m.date) + " " + fmtTime(m.date) : esc(m.raw)}</div>
+        <div>${m.from === me ? "Вы: " : ""}${rich(m.text.slice(0, 200), q)}</div></div>`;
+    }).join("");
+}
+
+// ---------- bookmarklet ----------
+// Runs on the Steam account-data page: presses "Load more" until the whole
+// history is loaded, then downloads only the tables (no page scripts or session data).
+function steamChatExport() {
+  if (window.__steamChatExport) return;
+  window.__steamChatExport = true;
+  const MORE = /загрузить ещё|загрузить еще|показать ещё|показать еще|load more|show more/i;
+  const rowCount = () => document.querySelectorAll("table tr").length;
+  const moreButton = () => [...document.querySelectorAll("a, button, input[type=button], [onclick], [role=button]")]
+    .find(el => el.offsetParent !== null && MORE.test(el.value || el.textContent || ""));
+
+  if (!document.querySelector("table")) {
+    alert("Таблица сообщений не найдена. Откройте страницу «Журнал сообщений» на help.steampowered.com и войдите в аккаунт.");
+    window.__steamChatExport = false;
+    return;
+  }
+  const status = document.createElement("div");
+  status.style.cssText = "position:fixed;top:12px;right:12px;z-index:99999;background:#1b2838;color:#fff;padding:12px 16px;border-radius:8px;font:14px sans-serif;box-shadow:0 4px 16px #0008";
+  document.body.appendChild(status);
+
+  let lastCount = -1, idle = 0;
+  const finish = note => {
+    const tables = [...document.querySelectorAll("table")].map(t => t.outerHTML).join("\n");
+    const html = `<!doctype html><meta charset="utf-8"><title>Steam chat export</title>\n${tables}`;
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }));
+    a.download = `steam-chat-${new Date().toISOString().slice(0, 10)}.html`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    status.textContent = `Готово: ${rowCount()} строк сохранено.` + (note ? " " + note : "");
+    setTimeout(() => status.remove(), 8000);
+    window.__steamChatExport = false;
+  };
+  const tick = () => {
+    const n = rowCount();
+    if (n !== lastCount) { lastCount = n; idle = 0; } else idle++;
+    const btn = moreButton();
+    status.textContent = `Загружаю историю… строк: ${n}`;
+    if (!btn) return idle >= 3 ? finish() : setTimeout(tick, 700);
+    if (idle === 0 || idle % 15 === 0) btn.click();   // click once per new page, retry if stuck
+    if (idle > 60) return finish("(Steam перестал отвечать — история может быть неполной, попробуйте ещё раз позже.)");
+    setTimeout(tick, 700);
+  };
+  tick();
+}
+$("#bookmarklet").href = "javascript:(" + encodeURIComponent(steamChatExport.toString()) + ")()";
+$("#bookmarklet").onclick = e => { e.preventDefault(); alert("Перетащите эту кнопку на панель закладок, а нажимайте её на странице Steam."); };
+
+// ---------- events ----------
+async function load(sources) {
+  const list = extract(sources);
+  if (!list.length) {
+    $("#importMsg").textContent = "Не нашёл сообщений. Убедитесь, что сохранили именно страницу «Журнал сообщений» (Ctrl+S → «только HTML»).";
+    return;
+  }
+  build(list);
+  $("#import").style.display = "none";
+  $("#viewer").classList.add("on");
+}
+
+async function readFiles(files) {
+  const texts = await Promise.all([...files].map(f => f.text()));
+  load(texts);
+}
+
+$("#pick").onclick = () => $("#file").click();
+$("#file").onchange = e => readFiles(e.target.files);
+const drop = $("#drop");
+["dragenter", "dragover"].forEach(ev => document.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach(ev => document.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+document.addEventListener("drop", e => { if (e.dataTransfer.files.length) readFiles(e.dataTransfer.files); });
+$("#pasteGo").onclick = () => load([$("#paste").value]);
+document.addEventListener("paste", e => {
+  if ($("#import").style.display === "none" || e.target === $("#paste")) return;
+  const html = e.clipboardData.getData("text/html") || e.clipboardData.getData("text/plain");
+  if (html) load([html]);
+});
+
+$("#contacts").onclick = e => {
+  const c = e.target.closest(".contact");
+  if (c) return openChat(c.dataset.name);
+  const r = e.target.closest(".result");
+  if (r) {
+    const m = messages[+r.dataset.i];
+    const other = m.from === me ? m.to : m.from;
+    $("#chatSearch").value = "";
+    current = other;
+    $("#viewer").classList.add("chat-open");
+    renderChat(m);
+  }
+};
+$("#contactSearch").oninput = () => { $("#globalSearch").value = ""; renderContacts(); };
+$("#globalSearch").oninput = e => { const q = e.target.value.trim(); q.length >= 2 ? renderGlobalResults(q) : renderContacts(); };
+$("#chatSearch").oninput = () => current && renderChat();
+$("#back").onclick = () => { current = null; renderContacts(); renderEmpty(); };
+$("#reload").onclick = () => location.reload();
+$("#swapMe").onclick = () => {
+  const i = people.indexOf(me);
+  const options = people.slice(0, 15).map((p, k) => `${k + 1}. ${p}`).join("\n");
+  const ans = prompt("Кто из участников — вы? Введите номер:\n\n" + options, String(i + 1));
+  const n = parseInt(ans, 10);
+  if (n >= 1 && n <= people.length) setMe(people[n - 1]);
+};
+$("#exportTxt").onclick = () => {
+  if (!current) return;
+  const lines = chats.get(current).map(m => `[${m.date ? m.date.toLocaleString("ru-RU") : m.raw}] ${m.from}: ${m.text}`);
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8" }));
+  a.download = `steam-chat-${current.replace(/[\\/:*?"<>|]/g, "_")}.txt`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+</script>
+</body>
+</html>
