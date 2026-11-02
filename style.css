@@ -104,3 +104,8 @@ dialog::backdrop { background: #0009; }
 #themeName { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; width: 100%; }
 .dlg-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 aside footer .theme-open { flex: 0 0 auto; padding: 6px 10px; }
+
+/* ---------- browser extension ---------- */
+body.ext .web-only, body:not(.ext) .ext-only { display: none; }
+#extStatus { margin: 6px 0 10px; }
+#toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 10; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px; box-shadow: 0 4px 16px #0006; }

@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "Steam Chat Viewer",
+  "version": "1.0.0",
+  "description": "Загружает историю переписки Steam со страницы данных аккаунта и показывает её как мессенджер. Всё хранится только в вашем браузере.",
+  "permissions": ["storage", "scripting", "alarms", "unlimitedStorage"],
+  "host_permissions": ["https://help.steampowered.com/*"],
+  "background": { "service_worker": "extension/background.js" },
+  "action": { "default_title": "Steam Chat Viewer", "default_popup": "extension/popup.html" }
+}

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Steam Chat Viewer</title>
+<link rel="stylesheet" href="../style.css">
+<style>
+  html, body { height: auto; }
+  body { width: 300px; padding: 14px; display: grid; gap: 10px; }
+  h1 { font-size: 15px; margin: 0; }
+  #status { color: var(--muted); font-size: 12px; min-height: 2.6em; }
+  #status.err { color: #ff8a80; }
+  label { display: flex; gap: 8px; align-items: flex-start; font-size: 12px; color: var(--muted); cursor: pointer; }
+  label input { margin-top: 2px; }
+</style>
+</head>
+<body>
+  <h1>Steam Chat Viewer</h1>
+  <button class="primary" id="open">Открыть историю</button>
+  <button id="sync">⟳ Обновить историю</button>
+  <div id="status"></div>
+  <label><input type="checkbox" id="auto">
+    <span>Обновлять историю автоматически раз в день. Расширение будет само открывать страницу данных аккаунта Steam в фоновой вкладке.</span></label>
+  <script src="status.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

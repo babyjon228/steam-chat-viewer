@@ -289,52 +289,29 @@ function renderGlobalResults(q) {
 }
 
 // ---------- bookmarklet ----------
-// Runs on the Steam account-data page: presses "Load more" until the whole
-// history is loaded, then downloads only the tables (no page scripts or session data).
-function steamChatExport() {
+// Runs on the Steam account-data page with steamCollect (extension/collector.js) passed in,
+// then downloads the collected tables as a file.
+function steamChatExport(collect) {
   if (window.__steamChatExport) return;
   window.__steamChatExport = true;
-  const MORE = /загрузить ещё|загрузить еще|показать ещё|показать еще|load more|show more/i;
-  const rowCount = () => document.querySelectorAll("table tr").length;
-  const moreButton = () => [...document.querySelectorAll("a, button, input[type=button], [onclick], [role=button]")]
-    .find(el => el.offsetParent !== null && MORE.test(el.value || el.textContent || ""));
-
-  if (!document.querySelector("table")) {
-    alert("Таблица сообщений не найдена. Откройте страницу «Журнал сообщений» на help.steampowered.com и войдите в аккаунт.");
-    window.__steamChatExport = false;
-    return;
-  }
   const status = document.createElement("div");
   status.style.cssText = "position:fixed;top:12px;right:12px;z-index:99999;background:#1b2838;color:#fff;padding:12px 16px;border-radius:8px;font:14px sans-serif;box-shadow:0 4px 16px #0008";
   document.body.appendChild(status);
-
-  let lastCount = -1, idle = 0;
-  const finish = note => {
-    const tables = [...document.querySelectorAll("table")].map(t => t.outerHTML).join("\n");
-    const html = `<!doctype html><meta charset="utf-8"><title>Steam chat export</title>\n${tables}`;
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }));
-    a.download = `steam-chat-${new Date().toISOString().slice(0, 10)}.html`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    status.textContent = `Готово: ${rowCount()} строк сохранено.` + (note ? " " + note : "");
-    setTimeout(() => status.remove(), 8000);
-    window.__steamChatExport = false;
-  };
-  const tick = () => {
-    const n = rowCount();
-    if (n !== lastCount) { lastCount = n; idle = 0; } else idle++;
-    const btn = moreButton();
-    status.textContent = `Загружаю историю… строк: ${n}`;
-    if (!btn) return idle >= 3 ? finish() : setTimeout(tick, 700);
-    if (idle === 0 || idle % 15 === 0) btn.click();   // click once per new page, retry if stuck
-    if (idle > 60) return finish("(Steam перестал отвечать — история может быть неполной, попробуйте ещё раз позже.)");
-    setTimeout(tick, 700);
-  };
-  tick();
+  collect(n => { status.textContent = `Загружаю историю… строк: ${n}`; })
+    .then(({ html, rows, partial }) => {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }));
+      a.download = `steam-chat-${new Date().toISOString().slice(0, 10)}.html`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      status.textContent = `Готово: ${rows} строк сохранено.` +
+        (partial ? " (Steam перестал отвечать — история может быть неполной, попробуйте ещё раз позже.)" : "");
+    })
+    .catch(() => { status.textContent = "Таблица сообщений не найдена. Откройте страницу «Журнал сообщений» на help.steampowered.com и войдите в аккаунт."; })
+    .finally(() => { window.__steamChatExport = false; setTimeout(() => status.remove(), 8000); });
 }
-$("#bookmarklet").href = "javascript:(" + encodeURIComponent(steamChatExport.toString()) + ")()";
+$("#bookmarklet").href = "javascript:(" + encodeURIComponent(steamChatExport.toString()) + ")(" + encodeURIComponent(steamCollect.toString()) + ")";
 $("#bookmarklet").onclick = e => { e.preventDefault(); alert("Перетащите эту кнопку на панель закладок, а нажимайте её на странице Steam."); };
 
 // ---------- events ----------
@@ -524,3 +501,42 @@ $("#themeDlg").onclick = e => { if (e.target === $("#themeDlg")) $("#themeDlg").
 $("#themeDlg").onclose = () => { if (!themeSaved) selectTheme(themeName); };  // drop unsaved preview
 
 selectTheme(findTheme(themeName).name);
+
+// ---------- browser extension ----------
+// Opened from the extension: history comes from chrome.storage instead of a file.
+if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.id && chrome.storage) {
+  document.body.classList.add("ext");
+  let toastTimer;
+  const toast = text => {
+    $("#toast").textContent = text;
+    $("#toast").hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { $("#toast").hidden = true; }, 6000);
+  };
+  const sync = () => chrome.runtime.sendMessage({ type: "sync" });
+
+  const loadStored = async () => {
+    const { history } = await chrome.storage.local.get("history");
+    if (!history) return;
+    const open = current;
+    load([history]);
+    if (open && chats.has(open)) openChat(open);
+  };
+  const showStatus = s => {
+    $("#extStatus").textContent = syncStatusText(s);
+    $("#extSync").disabled = $("#reload").disabled = !!s && s.state === "syncing";
+    if (s && $("#viewer").classList.contains("on")) toast(syncStatusText(s));
+  };
+
+  $("#extSync").onclick = sync;
+  $("#reload").textContent = "⟳ Обновить";
+  $("#reload").title = "Загрузить свежую историю из Steam";
+  $("#reload").onclick = sync;
+  chrome.storage.onChanged.addListener((ch, area) => {
+    if (area !== "local") return;
+    if (ch.history) loadStored();
+    if (ch.status) showStatus(ch.status.newValue);
+  });
+  chrome.storage.local.get("status").then(({ status }) => showStatus(status));
+  loadStored();
+}

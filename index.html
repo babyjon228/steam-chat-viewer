@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Steam Chat Viewer</title>
-<link rel="stylesheet" href="style.css?v=3">
+<link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
 
@@ -13,7 +13,14 @@
   <h1>Steam Chat Viewer</h1>
   <div class="sub">Удобный просмотр истории переписки из Steam. Всё работает локально, файл никуда не отправляется.</div>
 
-  <div class="steps">
+  <div class="steps ext-only">
+    <b>Расширение установлено</b>
+    <p class="hint" id="extStatus"></p>
+    <button class="primary" id="extSync">⟳ Загрузить историю из Steam</button>
+    <div class="hint" style="margin-top:8px">Расширение откроет страницу данных аккаунта Steam в фоновой вкладке и само загрузит всю переписку. Если вы не вошли в Steam, вкладка откроется — войдите и нажмите кнопку ещё раз.</div>
+  </div>
+
+  <div class="steps web-only">
     <b>Быстрый способ — закладка</b>
     <ol>
       <li>Перетащите эту кнопку на панель закладок браузера: <a id="bookmarklet" class="bm" href="#" title="Перетащите на панель закладок">📥 Steam → история чатов</a>
@@ -24,7 +31,7 @@
     </ol>
   </div>
 
-  <details class="steps manual">
+  <details class="steps manual web-only">
     <summary><b>Ручной способ</b></summary>
     <ol>
       <li>Откройте страницу <a href="https://help.steampowered.com/ru/accountdata/GetFriendMessagesLog" target="_blank" rel="noopener">help.steampowered.com → Данные аккаунта → Журнал сообщений</a> и войдите в аккаунт.</li>
@@ -47,6 +54,8 @@
   </details>
   <div id="importMsg"></div>
 </section>
+
+<div id="toast" hidden></div>
 
 <section id="viewer">
   <aside>
@@ -92,6 +101,8 @@
   </div>
 </dialog>
 
-<script src="app.js?v=3"></script>
+<script src="extension/collector.js?v=4"></script>
+<script src="extension/status.js?v=4"></script>
+<script src="app.js?v=4"></script>
 </body>
 </html>
