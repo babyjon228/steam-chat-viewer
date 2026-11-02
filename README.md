@@ -14,9 +14,19 @@ Steam не хранит историю чатов на компьютере: е�
 - поиск по собеседникам, по всем сообщениям и внутри чата;
 - экспорт переписки с одним человеком в `.txt`.
 
+## Стек
+
+![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?logo=javascript&logoColor=black)
+![HTML5](https://img.shields.io/badge/HTML5-E34F26?logo=html5&logoColor=white)
+![CSS3](https://img.shields.io/badge/CSS3-1572B6?logo=css3&logoColor=white)
+
+- **JavaScript** (ES2020, без фреймворков и сборки) — разбор выгрузки Steam, интерфейс чатов, поиск, экспорт, закладка для автозагрузки истории (`app.js`);
+- **HTML5** — разметка (`index.html`);
+- **CSS3** — оформление в стиле Steam, адаптивная вёрстка (`style.css`).
+
 ## Как пользоваться
 
-1. Откройте `index.html` в браузере (или страницу GitHub Pages этого репозитория).
+1. Откройте страницу GitHub Pages этого репозитория или скачайте репозиторий (Code → Download ZIP) и откройте `index.html`.
 2. Перетащите кнопку **«📥 Steam → история чатов»** на панель закладок.
 3. Откройте журнал сообщений Steam, войдите в аккаунт и нажмите закладку:
    она сама подгрузит всю историю и скачает файл `steam-chat-ДАТА.html`.
