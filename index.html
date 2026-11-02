@@ -9,6 +9,7 @@
 <body>
 
 <section id="import">
+  <button class="theme-open theme-top" title="Тема оформления">🎨 Тема</button>
   <h1>Steam Chat Viewer</h1>
   <div class="sub">Удобный просмотр истории переписки из Steam. Всё работает локально, файл никуда не отправляется.</div>
 
@@ -58,6 +59,7 @@
     <footer>
       <button id="swapMe" title="Если программа неправильно определила, кто из участников — вы">Это не я</button>
       <button id="reload">Другой файл</button>
+      <button class="theme-open" title="Тема оформления">🎨</button>
     </footer>
   </aside>
   <main>
@@ -70,6 +72,25 @@
     <div id="messages"><div class="empty">Выберите собеседника слева</div></div>
   </main>
 </section>
+
+<dialog id="themeDlg">
+  <div class="dlg-head"><b>Тема оформления</b><button id="themeClose" aria-label="Закрыть">✕</button></div>
+  <div class="dlg-body">
+    <div id="themeList" class="theme-list"></div>
+    <details id="themeEditor">
+      <summary>Создать свою тему</summary>
+      <div class="hint" style="margin-top:8px">Начните с любой темы выше и меняйте цвета — изменения видны сразу.</div>
+      <div id="themeFields" class="theme-fields"></div>
+      <input type="text" id="themeName" placeholder="Название темы" maxlength="40">
+      <div class="dlg-actions">
+        <button class="primary" id="themeSave">Сохранить тему</button>
+        <button id="themeExport" title="Скопировать тему, чтобы поделиться">Скопировать JSON</button>
+        <button id="themeImport" title="Добавить тему, которой с вами поделились">Вставить JSON</button>
+      </div>
+      <div id="themeMsg" class="hint" style="margin-top:8px"></div>
+    </details>
+  </div>
+</dialog>
 
 <script src="app.js"></script>
 </body>

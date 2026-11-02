@@ -401,3 +401,126 @@ $("#exportTxt").onclick = () => {
   a.click();
   URL.revokeObjectURL(a.href);
 };
+
+// ---------- themes ----------
+const THEME_VARS = {
+  "bg": "Фон", "panel": "Панели", "panel2": "Кнопки и выделение", "line": "Границы",
+  "text": "Текст", "muted": "Второстепенный текст", "accent": "Акцент", "on-accent": "Текст на акценте",
+  "mine": "Мои сообщения", "theirs": "Сообщения собеседника", "hl": "Подсветка поиска"
+};
+const PRESETS = [
+  { name: "Steam", vars: { bg: "#171a21", panel: "#1b2838", panel2: "#213246", line: "#2a3f5a", text: "#e6edf3", muted: "#8f98a0", accent: "#66c0f4", "on-accent": "#0b1620", mine: "#2b5278", theirs: "#2a3442", hl: "#f5c518" } },
+  { name: "Светлая", vars: { bg: "#f3f5f8", panel: "#ffffff", panel2: "#e9eef4", line: "#d5dde6", text: "#1b2430", muted: "#6b7785", accent: "#1a73e8", "on-accent": "#ffffff", mine: "#d6e8ff", theirs: "#ffffff", hl: "#ffd54f" } },
+  { name: "Графит", vars: { bg: "#121212", panel: "#1e1e1e", panel2: "#2a2a2a", line: "#333333", text: "#e8e8e8", muted: "#9a9a9a", accent: "#8ab4f8", "on-accent": "#0b1620", mine: "#3a4a63", theirs: "#2a2a2a", hl: "#f5c518" } },
+  { name: "AMOLED", vars: { bg: "#000000", panel: "#0a0a0a", panel2: "#161616", line: "#222222", text: "#f0f0f0", muted: "#888888", accent: "#4fc3f7", "on-accent": "#000000", mine: "#0d3550", theirs: "#161616", hl: "#ffeb3b" } },
+  { name: "Фиолетовая", vars: { bg: "#1a1625", panel: "#241e33", panel2: "#2f2742", line: "#3d3354", text: "#ece6f7", muted: "#a296b8", accent: "#b58cff", "on-accent": "#1a1033", mine: "#4b3478", theirs: "#2f2742", hl: "#ffcc66" } },
+  { name: "Лес", vars: { bg: "#141c17", panel: "#1b261f", panel2: "#243329", line: "#2f4236", text: "#e3efe6", muted: "#8fa596", accent: "#6fcf97", "on-accent": "#0f2018", mine: "#2d5a3f", theirs: "#243329", hl: "#f2c94c" } }
+];
+const store = {
+  get(key, fallback) { try { const v = localStorage.getItem(key); return v === null ? fallback : JSON.parse(v); } catch { return fallback; } },
+  set(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} }
+};
+let customThemes = store.get("scv-custom-themes", []);
+let themeName = store.get("scv-theme", "Steam");
+let themeSaved = true;   // false while the editor previews unsaved colors
+
+const allThemes = () => [...PRESETS, ...customThemes];
+const findTheme = name => allThemes().find(t => t.name === name) || PRESETS[0];
+
+function applyVars(vars) {
+  const root = document.documentElement.style;
+  for (const k of Object.keys(THEME_VARS)) root.setProperty("--" + k, vars[k]);
+  // native controls (scrollbars, inputs) follow the background brightness
+  const [r, g, b] = [1, 3, 5].map(i => parseInt(vars.bg.slice(i, i + 2), 16));
+  root.colorScheme = (r * 299 + g * 587 + b * 114) / 1000 > 128 ? "light" : "dark";
+}
+
+function sanitizeTheme(t) {
+  if (!t || typeof t !== "object" || typeof t.name !== "string" || typeof t.vars !== "object") return null;
+  const vars = {};
+  for (const k of Object.keys(THEME_VARS)) {
+    const v = String(t.vars[k] || "");
+    vars[k] = /^#[0-9a-f]{6}$/i.test(v) ? v.toLowerCase() : PRESETS[0].vars[k];
+  }
+  const name = t.name.trim().slice(0, 40);
+  return name ? { name, vars } : null;
+}
+
+function selectTheme(name) {
+  themeName = name;
+  themeSaved = true;
+  store.set("scv-theme", name);
+  const t = findTheme(name);
+  applyVars(t.vars);
+  fillEditor(t);
+  renderThemeList();
+}
+
+function renderThemeList() {
+  $("#themeList").innerHTML = allThemes().map(t => {
+    const custom = !PRESETS.includes(t);
+    return `<button class="theme-card ${t.name === themeName && themeSaved ? "active" : ""}" data-theme="${esc(t.name)}">
+      ${custom ? `<span class="del" data-del="${esc(t.name)}" title="Удалить тему">✕</span>` : ""}
+      <span>${esc(t.name)}</span>
+      <span class="sw">${["bg", "panel", "accent", "mine", "theirs"].map(k => `<span style="background:${t.vars[k]}"></span>`).join("")}</span>
+    </button>`;
+  }).join("");
+}
+
+function fillEditor(t) {
+  $("#themeFields").innerHTML = Object.entries(THEME_VARS).map(([k, label]) =>
+    `<label><input type="color" data-var="${k}" value="${t.vars[k]}">${label}</label>`).join("");
+  $("#themeName").value = PRESETS.includes(t) ? "" : t.name;
+  $("#themeMsg").textContent = "";
+}
+
+const editorVars = () => Object.fromEntries([...$("#themeFields").querySelectorAll("input")].map(i => [i.dataset.var, i.value]));
+
+$("#themeFields").oninput = () => {
+  themeSaved = false;
+  applyVars(editorVars());
+  renderThemeList();
+};
+$("#themeList").onclick = e => {
+  const del = e.target.closest("[data-del]");
+  if (del) {
+    customThemes = customThemes.filter(t => t.name !== del.dataset.del);
+    store.set("scv-custom-themes", customThemes);
+    if (themeName === del.dataset.del) selectTheme("Steam"); else renderThemeList();
+    return;
+  }
+  const card = e.target.closest("[data-theme]");
+  if (card) selectTheme(card.dataset.theme);
+};
+function addCustom(theme) {
+  if (PRESETS.some(p => p.name === theme.name)) theme.name += " (моя)";
+  customThemes = customThemes.filter(t => t.name !== theme.name).concat(theme);
+  store.set("scv-custom-themes", customThemes);
+  selectTheme(theme.name);
+}
+$("#themeSave").onclick = () => {
+  const theme = sanitizeTheme({ name: $("#themeName").value, vars: editorVars() });
+  if (!theme) { $("#themeMsg").textContent = "Введите название темы."; $("#themeName").focus(); return; }
+  addCustom(theme);
+  $("#themeMsg").textContent = `Тема «${theme.name}» сохранена.`;
+};
+$("#themeExport").onclick = async () => {
+  const json = JSON.stringify({ name: $("#themeName").value.trim() || findTheme(themeName).name, vars: editorVars() });
+  try { await navigator.clipboard.writeText(json); $("#themeMsg").textContent = "JSON темы скопирован — отправьте его другу."; }
+  catch { prompt("Скопируйте JSON темы:", json); }
+};
+$("#themeImport").onclick = () => {
+  const text = prompt("Вставьте JSON темы:");
+  if (!text) return;
+  let theme = null;
+  try { theme = sanitizeTheme(JSON.parse(text)); } catch {}
+  if (!theme) { $("#themeMsg").textContent = "Не похоже на JSON темы."; return; }
+  addCustom(theme);
+  $("#themeMsg").textContent = `Тема «${theme.name}» добавлена.`;
+};
+document.querySelectorAll(".theme-open").forEach(b => b.onclick = () => { renderThemeList(); $("#themeDlg").showModal(); });
+$("#themeClose").onclick = () => $("#themeDlg").close();
+$("#themeDlg").onclick = e => { if (e.target === $("#themeDlg")) $("#themeDlg").close(); };
+$("#themeDlg").onclose = () => { if (!themeSaved) selectTheme(themeName); };  // drop unsaved preview
+
+selectTheme(findTheme(themeName).name);
